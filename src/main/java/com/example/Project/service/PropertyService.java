@@ -8,9 +8,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 @Transactional
@@ -32,16 +32,95 @@ public class PropertyService {
 	public List<Property> findAll(Optional<String> city,
 								  Optional<String> listingType,
 								  Optional<BigDecimal> minPrice,
-								  Optional<BigDecimal> maxPrice) {
+								  Optional<BigDecimal> maxPrice,
+								  Optional<Integer> minBedrooms,
+								  Optional<PropertyStatus> status,
+								  Optional<String> sortBy,
+								  Optional<String> sortDir,
+								  Optional<Integer> page,
+								  Optional<Integer> size) {
 		List<Property> all = propertyRepository.findAll();
 
-		return all.stream()
+		Stream<Property> stream = all.stream()
 				.filter(p -> city.map(c -> p.getCity() != null && p.getCity().equalsIgnoreCase(c)).orElse(true))
 				.filter(p -> listingType.map(t -> p.getListingType() != null &&
 						p.getListingType().name().equalsIgnoreCase(t)).orElse(true))
 				.filter(p -> minPrice.map(min -> p.getPrice() != null && p.getPrice().compareTo(min) >= 0).orElse(true))
 				.filter(p -> maxPrice.map(max -> p.getPrice() != null && p.getPrice().compareTo(max) <= 0).orElse(true))
+				.filter(p -> minBedrooms.map(minBeds -> p.getBedrooms() != null && p.getBedrooms() >= minBeds).orElse(true))
+				.filter(p -> status.map(st -> p.getStatus() == st).orElse(true));
+
+		// Sorting
+		String sortByValue = sortBy.orElse("createdAt");
+		boolean desc = sortDir.map(s -> s.equalsIgnoreCase("desc")).orElse(true);
+
+		Comparator<Property> comparator;
+		switch (sortByValue) {
+			case "price" -> comparator = Comparator.comparing(
+					Property::getPrice,
+					Comparator.nullsLast(Comparator.naturalOrder())
+			);
+			case "bedrooms" -> comparator = Comparator.comparing(
+					Property::getBedrooms,
+					Comparator.nullsLast(Comparator.naturalOrder())
+			);
+			case "city" -> comparator = Comparator.comparing(
+					p -> Optional.ofNullable(p.getCity()).orElse(""),
+					String.CASE_INSENSITIVE_ORDER
+			);
+			default -> comparator = Comparator.comparing(
+					Property::getCreatedAt,
+					Comparator.nullsLast(Comparator.naturalOrder())
+			);
+		}
+		if (desc) {
+			comparator = comparator.reversed();
+		}
+
+		List<Property> sorted = stream.sorted(comparator).toList();
+
+		// Simple in-memory pagination
+		int pageNumber = page.orElse(0);
+		int pageSize = size.orElse(20);
+		if (pageNumber < 0) {
+			pageNumber = 0;
+		}
+		if (pageSize <= 0) {
+			pageSize = 20;
+		}
+
+		int fromIndex = pageNumber * pageSize;
+		if (fromIndex >= sorted.size()) {
+			return Collections.emptyList();
+		}
+		int toIndex = Math.min(fromIndex + pageSize, sorted.size());
+		return sorted.subList(fromIndex, toIndex);
+	}
+
+	public List<Property> latest(int limit) {
+		if (limit <= 0) {
+			limit = 10;
+		}
+		return propertyRepository.findAll().stream()
+				.sorted(Comparator.comparing(Property::getCreatedAt,
+								Comparator.nullsLast(Comparator.naturalOrder()))
+						.reversed())
+				.limit(limit)
 				.collect(Collectors.toList());
+	}
+
+	public Map<String, Long> statsByCity() {
+		return propertyRepository.findAll().stream()
+				.filter(p -> p.getCity() != null && !p.getCity().isBlank())
+				.collect(Collectors.groupingBy(
+						p -> p.getCity().toLowerCase(),
+						Collectors.counting()
+				));
+	}
+
+	public Map<PropertyStatus, Long> statsByStatus() {
+		return propertyRepository.findAll().stream()
+				.collect(Collectors.groupingBy(Property::getStatus, Collectors.counting()));
 	}
 
 	public Optional<Property> findById(Long id) {

@@ -29,10 +29,43 @@ public class PropertyController {
 			@RequestParam Optional<String> city,
 			@RequestParam Optional<String> listingType,
 			@RequestParam Optional<BigDecimal> minPrice,
-			@RequestParam Optional<BigDecimal> maxPrice
+			@RequestParam Optional<BigDecimal> maxPrice,
+			@RequestParam Optional<Integer> minBedrooms,
+			@RequestParam Optional<PropertyStatus> status,
+			@RequestParam Optional<String> sortBy,
+			@RequestParam Optional<String> sortDir,
+			@RequestParam Optional<Integer> page,
+			@RequestParam Optional<Integer> size
 	) {
-		List<Property> properties = propertyService.findAll(city, listingType, minPrice, maxPrice);
+		List<Property> properties = propertyService.findAll(
+				city,
+				listingType,
+				minPrice,
+				maxPrice,
+				minBedrooms,
+				status,
+				sortBy,
+				sortDir,
+				page,
+				size
+		);
 		return ResponseEntity.ok(properties);
+	}
+
+	@GetMapping("/latest")
+	public ResponseEntity<List<Property>> latest(@RequestParam Optional<Integer> limit) {
+		int value = limit.orElse(10);
+		return ResponseEntity.ok(propertyService.latest(value));
+	}
+
+	@GetMapping("/stats/by-city")
+	public ResponseEntity<?> statsByCity() {
+		return ResponseEntity.ok(propertyService.statsByCity());
+	}
+
+	@GetMapping("/stats/by-status")
+	public ResponseEntity<?> statsByStatus() {
+		return ResponseEntity.ok(propertyService.statsByStatus());
 	}
 
 	@GetMapping("/{id}")
@@ -44,6 +77,7 @@ public class PropertyController {
 
 	@PostMapping
 	public ResponseEntity<Property> create(@Valid @RequestBody PropertyRequest request) {
+		// Requires authentication (see SecurityConfig)
 		Property created = propertyService.create(request);
 		return ResponseEntity.created(URI.create("/api/properties/" + created.getId()))
 				.body(created);
@@ -52,6 +86,7 @@ public class PropertyController {
 	@PutMapping("/{id}")
 	public ResponseEntity<Property> update(@PathVariable Long id,
 										   @Valid @RequestBody PropertyRequest request) {
+		// Requires authentication (see SecurityConfig)
 		return propertyService.update(id, request)
 				.map(ResponseEntity::ok)
 				.orElseGet(() -> ResponseEntity.notFound().build());
@@ -60,6 +95,7 @@ public class PropertyController {
 	@PatchMapping("/{id}/status")
 	public ResponseEntity<Property> updateStatus(@PathVariable Long id,
 												 @RequestParam PropertyStatus status) {
+		// Requires authentication (see SecurityConfig)
 		return propertyService.markStatus(id, status)
 				.map(ResponseEntity::ok)
 				.orElseGet(() -> ResponseEntity.notFound().build());
@@ -67,6 +103,7 @@ public class PropertyController {
 
 	@DeleteMapping("/{id}")
 	public ResponseEntity<Void> delete(@PathVariable Long id) {
+		// Requires authentication (see SecurityConfig)
 		boolean removed = propertyService.delete(id);
 		return removed ? ResponseEntity.noContent().build() : ResponseEntity.notFound().build();
 	}

@@ -33,10 +33,18 @@ Global CORS is configured for all `/api/**` endpoints in:
 
 It currently allows any origin (`*`) and common HTTP methods, which is convenient for local frontend development.
 
-### Main endpoints
+### Main endpoints (properties)
 
 - **GET** `/api/properties`  
-  Optional query params: `city`, `listingType` (`RENT` / `SALE`), `minPrice`, `maxPrice`
+  Optional query params:  
+  - `city`  
+  - `listingType` (`RENT` / `SALE`)  
+  - `minPrice`, `maxPrice`  
+  - `minBedrooms`  
+  - `status` (`AVAILABLE`, `PENDING`, `SOLD`, `RENTED`)  
+  - `sortBy` (`createdAt` (default), `price`, `bedrooms`, `city`)  
+  - `sortDir` (`asc` / `desc`, default `desc`)  
+  - `page` (0-based, default `0`), `size` (default `20`)
 
 - **GET** `/api/properties/{id}`
 
@@ -54,4 +62,36 @@ It currently allows any origin (`*`) and common HTTP methods, which is convenien
 - **PATCH** `/api/properties/{id}/status?status=AVAILABLE|PENDING|SOLD|RENTED`
 
 - **DELETE** `/api/properties/{id}`
+
+### Extra property endpoints
+
+- **GET** `/api/properties/latest`  
+  Query param: `limit` (default `10`) – returns the most recently created listings.
+
+- **GET** `/api/properties/stats/by-city`  
+  Returns a JSON map of `city -> count`.
+
+- **GET** `/api/properties/stats/by-status`  
+  Returns a JSON map of `status -> count`.
+
+### Inquiry endpoints
+
+These let interested buyers/renters contact owners about a specific property.
+
+- **POST** `/api/properties/{propertyId}/inquiries`  
+  Body:
+  - `name` (string, required)
+  - `email` (string, required, email)
+  - `phone` (string, optional)
+  - `message` (string, required)
+  - `preferredVisitTime` (ISO date-time, optional)
+
+- **GET** `/api/properties/{propertyId}/inquiries`  
+  Get all inquiries for a given property.
+
+- **GET** `/api/inquiries`  
+  Optional: `status` (`NEW`, `VIEWED`, `RESPONDED`, `CLOSED`) – otherwise returns all.
+
+- **PATCH** `/api/inquiries/{id}/status?status=NEW|VIEWED|RESPONDED|CLOSED`  
+  Update the status of a specific inquiry.
 
